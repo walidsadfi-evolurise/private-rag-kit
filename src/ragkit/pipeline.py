@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ragkit.answer import Answerer
@@ -19,6 +19,7 @@ class IngestReport:
     documents: int
     chunks: int
     skipped: list[str]
+    unchanged: list[str] = field(default_factory=list)
 
 
 class Pipeline:
@@ -40,10 +41,24 @@ class Pipeline:
         llm = make_llm(s.llm_provider, s.llm_model, llm_key, s.llm_base_url)
         return cls(s, store, embedder, llm)
 
-    def ingest(self, path: Path) -> IngestReport:
+    def ingest(self, path: Path, force: bool = False) -> IngestReport:
+        """Index every supported file under `path`.
+
+        Documents are content-addressed (doc_id = hash of source + text), so a
+        file that has not changed since the last run is skipped unless `force`.
+        """
         n_docs = n_chunks = 0
         skipped: list[str] = []
+        unchanged: list[str] = []
+        existing = {source: doc_id for doc_id, source, *_ in self.store.documents()}
         for doc in iter_documents(path):
+            previous = existing.get(doc.source)
+            if previous == doc.doc_id and not force:
+                unchanged.append(doc.source)
+                continue
+            if previous is not None and previous != doc.doc_id:
+                # Same file, new content: drop the old version so it is not retrievable next to the new one.
+                self.store.delete_document(previous)
             chunks = chunk_document(doc, self.settings.chunk_chars, self.settings.chunk_overlap)
             if not chunks:
                 skipped.append(doc.source)
@@ -52,4 +67,4 @@ class Pipeline:
             self.store.upsert(chunks, vectors)
             n_docs += 1
             n_chunks += len(chunks)
-        return IngestReport(n_docs, n_chunks, skipped)
+        return IngestReport(n_docs, n_chunks, skipped, unchanged)
