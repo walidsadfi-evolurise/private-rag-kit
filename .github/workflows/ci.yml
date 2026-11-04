@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests
+      - run: ruff format --check src tests
+      - run: mypy
+      - run: pytest -q
+      - name: Offline smoke test through the CLI
+        env:
+          RAG_STORE_URL: memory://${{ runner.temp }}/idx
+        run: |
+          rag ingest tests/fixtures/corpus
+          rag eval evalsets/demo.yaml --min-accuracy 0.8
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: false
+          load: true
+          tags: private-rag-kit:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Container starts and answers /healthz
+        run: |
+          docker run -d --name rag -p 8000:8000 -e RAG_STORE_URL=memory:///tmp/idx private-rag-kit:ci
+          for i in $(seq 1 20); do curl -fsS localhost:8000/healthz && break; sleep 1; done
+          curl -fsS localhost:8000/healthz | grep -q '"status":"ok"'

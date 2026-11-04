@@ -1,0 +1,19 @@
+# Eval set for the demo corpus in tests/fixtures/corpus.
+# Run: rag ingest tests/fixtures/corpus && rag eval evalsets/demo.yaml
+- question: How many days does a customer have to withdraw from a purchase?
+  expected_sources: [refund-policy.md]
+  expected_answer_contains: ["14 days"]
+- question: How fast are refunds issued?
+  expected_sources: [refund-policy.md]
+  expected_answer_contains: ["10 business days"]
+- question: What is the first response time for a Priority 1 incident?
+  expected_sources: [sla.md]
+  expected_answer_contains: ["1 hour"]
+- question: When are maintenance windows?
+  expected_sources: [sla.md]
+  expected_answer_contains: ["Tuesday"]
+- question: Within how many days must security training be completed?
+  expected_sources: [onboarding.html]
+  expected_answer_contains: ["30 days"]
+- question: What is the CEO's salary?
+  expect_refusal: true
