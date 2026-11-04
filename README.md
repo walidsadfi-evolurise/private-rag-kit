@@ -109,7 +109,7 @@ $ rag eval evalsets/demo.yaml --min-accuracy 0.8
 - **Citations are verified, not trusted.** `verify_citations` checks that every sentence carries a marker and every marker points at a retrieved source. Fail either and the answer is downgraded to the refusal text. The model's own `NO_ANSWER` is always believed.
 - **Refusal without an LLM call** when retrieval returns nothing: cheaper, and it never gets the chance to improvise.
 - **Hash embedder on purpose.** It's semantically weak, but deterministic and offline, so the test suite and CI exercise the whole pipeline — store, fusion, prompt, verification, API — in under a second with no keys. Never use it for real answers.
-- **Minimal surface.** No framework-of-frameworks. ~900 lines, typed (`mypy --strict`), 27 tests, `ruff`.
+- **Minimal surface.** No framework-of-frameworks. ~1 400 lines, typed (`mypy --strict`), 27 tests, `ruff`.
 
 ## Project layout
 
