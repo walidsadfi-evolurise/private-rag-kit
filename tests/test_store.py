@@ -53,3 +53,28 @@ def test_persistence_roundtrip(tmp_path: Path) -> None:
 def test_empty_store_searches_return_empty() -> None:
     s = MemoryStore()
     assert s.lexical_search("x", 3) == [] and s.vector_search(np.zeros(8, dtype=np.float32), 3) == []
+
+
+def test_ingest_skips_unchanged_documents_unless_forced(tmp_path: Path) -> None:
+    from ragkit.config import Settings
+    from ragkit.llm import FakeLLM
+    from ragkit.pipeline import Pipeline
+
+    src = tmp_path / "docs"
+    src.mkdir()
+    (src / "a.md").write_text("# A\n\nFirst version of the policy.")
+    p = Pipeline(Settings(store_url="memory://"), MemoryStore(), HashingEmbedder(), FakeLLM())
+    first = p.ingest(src)
+    assert first.documents == 1 and first.unchanged == []
+
+    again = p.ingest(src)
+    assert again.documents == 0 and again.unchanged == ["a.md"]
+    assert p.store.count() == first.chunks
+
+    (src / "a.md").write_text("# A\n\nSecond version of the policy, now longer.")
+    changed = p.ingest(src)
+    assert changed.documents == 1 and changed.unchanged == []
+    assert len(p.store.documents()) == 1  # old version replaced, not duplicated
+
+    forced = p.ingest(src, force=True)
+    assert forced.documents == 1 and forced.unchanged == []
